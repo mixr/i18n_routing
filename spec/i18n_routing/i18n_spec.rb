@@ -71,8 +71,10 @@ describe :localized_routes do
             end
 
             resource :foo do
+              get :thing
               resources :bars
               resource :foofoo do
+                get :thing
                 resources :bars
               end
             end
@@ -230,6 +232,13 @@ describe :localized_routes do
         routes.send(:groups_users_path).should == "/#{I18n.t :users, :scope => :resources}/#{I18n.t :groups, :scope => :'routes.users.path_names'}"
       end
 
+      it "custom method for singleton resource" do
+        I18n.locale = :en
+        routes.send(:thing_foo_path).should == "/#{I18n.t :foo, :scope => :resource}/thing"
+        I18n.locale = :fr
+        routes.send(:thing_foo_path).should == "/#{I18n.t :foo, :scope => :resource}/#{I18n.t :thing, :scope => :'path_names'}"
+      end
+
     end
 
     context "when nested" do
@@ -261,6 +270,10 @@ describe :localized_routes do
 
       it "routes should be translated correctly" do
         routes.send(:foo_bars_path).should == "/#{I18n.t :foo, :scope => :resource}/#{I18n.t :bars, :scope => :resources}"
+      end
+
+      it "routes for custom method should be translated correctly" do
+        routes.send(:thing_foo_foofoo_path).should == "/#{I18n.t :foo, :scope => :resource}/#{I18n.t :foofoo, :scope => :resource}/#{I18n.t :thing, :scope => :path_names}"
       end
 
       it "routes should be translated correctly also with deep nested singleton resource" do
