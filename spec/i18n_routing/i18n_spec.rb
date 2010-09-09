@@ -62,9 +62,9 @@ describe :localized_routes do
 
             resources :users do
               member do
-                get :level
+                get :level, :another_level
               end
-              get :groups, :on => :collection
+              get :groups, :other_groups, :on => :collection
             end
             resource  :contact
 
@@ -73,7 +73,7 @@ describe :localized_routes do
             end
 
             resource :foo do
-              get :thing
+              get :thing, :another_thing
               resources :bars
               resource :foofoo do
                 get :thing
@@ -228,16 +228,30 @@ describe :localized_routes do
 
       it "custom member" do
         I18n.locale = :en
-        routes.send(:level_user_path, 42).should == "/#{I18n.t :users, :scope => :resources}/42/level"        
+        routes.send(:level_user_path, 42).should == "/#{I18n.t :users, :scope => :resources}/42/level"
         I18n.locale = :fr
         routes.send(:level_user_path, 42).should == "/#{I18n.t :users, :scope => :resources}/42/#{I18n.t :level, :scope => :'routes.users.path_names'}"
       end
 
+      it "custom member defined as second parameter (-> get :level, :another_level)" do
+        I18n.locale = :en
+        routes.send(:another_level_user_path, 42).should == "/#{I18n.t :users, :scope => :resources}/42/#{I18n.t :another_level, :scope => :'path_names'}"
+        I18n.locale = :fr
+        routes.send(:another_level_user_path, 42).should == "/#{I18n.t :users, :scope => :resources}/42/#{I18n.t :another_level, :scope => :'routes.users.path_names'}"
+      end
+
       it "custom collection" do
         I18n.locale = :en
-        routes.send(:groups_users_path).should == "/#{I18n.t :users, :scope => :resources}/groups"        
+        routes.send(:groups_users_path).should == "/#{I18n.t :users, :scope => :resources}/groups"
         I18n.locale = :fr
         routes.send(:groups_users_path).should == "/#{I18n.t :users, :scope => :resources}/#{I18n.t :groups, :scope => :'routes.users.path_names'}"
+      end
+
+      it "custom collection defined as second parameter (-> get :groups, :other_groups, :on => :collection)" do
+        I18n.locale = :en
+        routes.send(:other_groups_users_path).should == "/#{I18n.t :users, :scope => :resources}/#{I18n.t :other_groups, :scope => :'path_names'}"
+        I18n.locale = :fr
+        routes.send(:other_groups_users_path).should == "/#{I18n.t :users, :scope => :resources}/#{I18n.t :other_groups, :scope => :'routes.users.path_names'}"
       end
 
       it "custom method for singleton resource" do
@@ -245,6 +259,13 @@ describe :localized_routes do
         routes.send(:thing_foo_path).should == "/#{I18n.t :foo, :scope => :resource}/thing"
         I18n.locale = :fr
         routes.send(:thing_foo_path).should == "/#{I18n.t :foo, :scope => :resource}/#{I18n.t :thing, :scope => :'path_names'}"
+      end
+
+      it "custom method for singleton resource defined as second parameter (-> get :thing, :another_thing)" do
+        I18n.locale = :en
+        routes.send(:another_thing_foo_path).should == "/#{I18n.t :foo, :scope => :resource}/#{I18n.t :another_thing, :scope => :'path_names'}"
+        I18n.locale = :fr
+        routes.send(:another_thing_foo_path).should == "/#{I18n.t :foo, :scope => :resource}/#{I18n.t :another_thing, :scope => :'path_names'}"
       end
 
     end

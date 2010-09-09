@@ -4,7 +4,9 @@ fr:
       as: utilisateurs
       path_names:
         level: 'niveau'
+        another_level: 'autre-niveau'
         groups: 'groupes'
+        other_groups: 'autre-groupes'
         new: 'nouvel_utilisateur'
         edit: 'edition_utilisateur'
     drones:
@@ -29,3 +31,4 @@ fr:
     new: 'nouveau'
     edit: 'edition'
     thing: chose
+    another_thing: autre-chose

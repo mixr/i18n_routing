@@ -11,3 +11,7 @@ en:
     contact: 'contact-us'
   named_routes_path:
     about: 'about-our-company'
+  path_names:
+    another_level: another-level
+    another_thing: another-thing
+    other_groups: other-groups
