@@ -28,7 +28,7 @@ module I18nRouting
         options = res.extract_options!
         r = res.first
 
-        resource = type == :resource ? ActionDispatch::Routing::Mapper::SingletonResource.new(r, options.dup) : ActionDispatch::Routing::Mapper::Resource.new(r, options.dup)
+        resource = resource_from_params(type, r, options.dup)
 
         # Check for translated resource
         @locales.each do |locale|
@@ -41,6 +41,8 @@ module I18nRouting
             opts = options.dup
             opts[:path] = localized_path
             opts[:controller] ||= r.to_s.pluralize
+            
+            resource = resource_from_params(type, r, opts.dup)
 
             res = ["#{locale}_#{r}".to_sym, opts]
 
@@ -50,8 +52,8 @@ module I18nRouting
             scope(:constraints => constraints, :path_names => I18nRouting.path_names(resource.name, @scope)) do
               localized_branch(locale) do
                 send(type, *res) do
+                  
                   # In the resource(s) block, we need to keep and restore some context :
-
                   if block
                     old_name = @scope[:i18n_real_resource_name]
                     old = @scope[:scope_level_resource]
@@ -106,7 +108,7 @@ module I18nRouting
     
     # Return the aproximate deep in scope level
     def nested_deep
-      (@scope and Array === @scope[:blocks] and @scope[:scope_level]) ? @scope[:blocks].size : 0
+      (@scope and Array === @scope[:nested_deep] and @scope[:scope_level]) ? @scope[:nested_deep].size : 0
     end
 
     public
@@ -119,6 +121,7 @@ module I18nRouting
       # Add i18n as valid conditions for Rack::Mount
       @valid_conditions = @set.instance_eval { @set }.instance_eval { @valid_conditions }
       @valid_conditions << :i18n_locale if !@valid_conditions.include?(:i18n_locale)
+      @set.valid_conditions << :i18n_locale if !@set.valid_conditions.include?(:i18n_locale)
 
       # Extends the current RouteSet in order to define localized helper for named routes
       # When calling define_url_helper, it calls define_localized_url_helper too.
@@ -146,7 +149,7 @@ module I18nRouting
     def localized(locales = I18n.available_locales, opts = {})
       # Add if not added Rails.root/config/locales/*.yml in the I18n.load_path
       if !@i18n_routing_path_set and defined?(Rails) and Rails.respond_to?(:root) and Rails.root
-        I18n.load_path = (I18n.load_path << Dir[Rails.root.join('config', 'locales', '*.yml').to_s]).uniq
+        I18n.load_path = (I18n.load_path << Dir[Rails.root.join('config', 'locales', '*.yml')]).flatten.uniq
         @i18n_routing_path_set = true
       end
       
@@ -181,15 +184,18 @@ module I18nRouting
     
     def match(*args)
       # Localize simple match only if there is no resource scope.
-      if args.size == 1 and @locales and !parent_resource and args.first[:as]
+      if args.size == 1 and @locales and !parent_resource and args.last.is_a?(Hash) and args.first[:as]
+        options = Marshal.load(Marshal.dump(args.first))
+        path, to = options.find { |name, value| name.is_a?(String) }
+        options.merge!(:to => to).delete(path)        
         @locales.each do |locale|
-          mapping = LocalizedMapping.new(locale, @set, @scope, Marshal.load(Marshal.dump(args))) # Dump is dirty but how to make deep cloning easily ? :/
+          mapping = LocalizedMapping.new(locale, @set, @scope, path, options) # Dump is dirty but how to make deep cloning easily ? :/
           if mapping.localizable?
             puts("[I18n] > localize %-10s: %40s (%s) => %s" % ['route', args.first[:as], locale, mapping.path]) if @i18n_verbose
             @set.add_route(*mapping.to_route)
           end
         end
-
+      
         # Now, create the real match :
         return set_localizable_route(args.first[:as]) do
           super
@@ -200,14 +206,16 @@ module I18nRouting
     end
     
     def create_globalized_resources(type, *resources, &block)
-
       #puts "#{' ' * nested_deep}Call #{type} : #{resources.inspect} (#{@locales.inspect}) (#{@localized_branch}) (#{@skip_localization})"
+
+      @scope[:nested_deep] ||= []
+      @scope[:nested_deep] << 1
 
       cur_scope = nil
       if @locales
         localized = localized_resources(type, *resources, &block) if !@skip_localization
 
-        ## We do not translate if we are in a translations branch :
+        ## We do not translate if we are in a translation branch :
         return if localized and nested_deep > 0
 
         # Set the current standard resource in order to customize url helper :
@@ -223,6 +231,8 @@ module I18nRouting
           send("#{type}_without_i18n_routing".to_sym, *resources, &block)
         end
       end
+      
+      @scope[:nested_deep].pop
 
     end
     
@@ -273,12 +283,13 @@ module I18nRouting
 
     attr_reader :path
 
-    def initialize(locale, set, scope, args)
-      super(set, scope, args.clone)
+    def initialize(locale, set, scope, path, options)
+      super(set, scope, path.clone, options ? options.clone : nil)
 
       # try to get translated path :
       I18n.locale = locale
       ts = @path.gsub(/^\//, '')
+      ts.gsub!('(.:format)', '')
       @localized_path = '/' + (I18nRouting.translation_for(ts, :named_routes_path) || ts)
 
       # If a translated path exists, set localized infos
@@ -372,5 +383,5 @@ module I18nRouting
   end
 end
 
-ActionDispatch::Routing::Mapper.send  :include, I18nRouting::Mapper
-Rack::Mount::Route.send               :include, I18nRouting::RackMountRoute
+ActionDispatch::Routing::Mapper.send    :include, I18nRouting::Mapper
+Rack::Mount::Route.send                 :include, I18nRouting::RackMountRoute
